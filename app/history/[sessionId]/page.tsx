@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Clock3 } from "lucide-react";
+import { Clock3, TrendingDown, TrendingUp } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { getSessionById } from "@/lib/store";
+import type { SetLog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +44,20 @@ export default async function SessionDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      {sessionData.exercises.map((exercise) => (
+      {sessionData.exercises.map((exercise) => {
+        const progressDirection = getExerciseProgressDirection(exercise.sets, exercise.last_session_set);
+        return (
         <section key={exercise.id} className="surface">
-          <h2 className="text-lg font-semibold">
-            {exercise.order_index}. {exercise.exercise_name_snapshot}
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">
+              {exercise.order_index}. {exercise.exercise_name_snapshot}
+            </h2>
+            {progressDirection === "up" ? (
+              <TrendingUp className="h-4 w-4 shrink-0 text-emerald-400" />
+            ) : progressDirection === "down" ? (
+              <TrendingDown className="h-4 w-4 shrink-0 text-red-400" />
+            ) : null}
+          </div>
           {exercise.sets.length === 0 ? (
             <p className="mt-2 text-sm text-muted">No sets recorded.</p>
           ) : (
@@ -77,7 +87,8 @@ export default async function SessionDetailPage({ params }: PageProps) {
             </div>
           )}
         </section>
-      ))}
+      );
+      })}
     </div>
   );
 }
@@ -104,4 +115,55 @@ function formatTimeOnly(value: string | Date) {
     minute: "2-digit",
     hour12: true,
   }).format(date);
+}
+
+function getExerciseProgressDirection(
+  sets: SetLog[],
+  previous: { session_name: string; started_at: Date; reps: number; weight: string | null } | null,
+) {
+  if (!previous) {
+    return null;
+  }
+
+  const currentBest = getBestSet(sets);
+  if (!currentBest) {
+    return null;
+  }
+
+  const previousWeight = safeNumber(previous.weight);
+  const previousReps = previous.reps;
+
+  if (
+    currentBest.weight > previousWeight ||
+    (currentBest.weight === previousWeight && currentBest.reps > previousReps)
+  ) {
+    return "up";
+  }
+
+  return "down";
+}
+
+function getBestSet(sets: SetLog[]) {
+  if (sets.length === 0) {
+    return null;
+  }
+
+  return sets.reduce(
+    (best, set) => {
+      const weight = safeNumber(set.weight);
+      if (weight > best.weight || (weight === best.weight && set.reps > best.reps)) {
+        return { weight, reps: set.reps };
+      }
+      return best;
+    },
+    { weight: -1, reps: 0 },
+  );
+}
+
+function safeNumber(value: string | null) {
+  if (!value) {
+    return 0;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

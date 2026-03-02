@@ -1,26 +1,48 @@
-import Link from "next/link";
-import { Activity, ArrowRight, BarChart3, CalendarDays, Clock3 } from "lucide-react";
+﻿import Link from "next/link";
+import { ArrowRight, BarChart3, CalendarDays, Clock3, TrendingUp } from "lucide-react";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { StartWorkoutModal } from "@/components/start-workout-modal";
 import { formatSessionDuration, formatWorkoutDateTime } from "@/lib/format";
-import { getAnalyticsSummary, listActiveSessions, listSessions, listTemplates, startSessionFromTemplate } from "@/lib/store";
+import {
+  getAnalyticsSummary,
+  listActiveSessions,
+  listCompletedSessionsWithProgress,
+  listTemplates,
+  startSessionFromTemplate,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const [allRecentSessions, templates, activeSessions, analytics30] = await Promise.all([
-    listSessions(20),
+    listCompletedSessionsWithProgress(20),
     listTemplates(),
     listActiveSessions(),
     getAnalyticsSummary(30),
   ]);
+
   const activeSession = activeSessions[0] ?? null;
-  const completedRecentSessions = allRecentSessions
-    .filter((session) => session.status === "completed")
-    .slice(0, 3);
+  const completedRecentSessions = allRecentSessions.slice(0, 3);
   const lastCompletedSession = completedRecentSessions[0] ?? null;
+
+  const trendPool = allRecentSessions.filter((session) => session.progress_direction !== null).slice(0, 6);
+  const trendUpCount = trendPool.filter((session) => session.progress_direction === "up").length;
+  const trendDownCount = trendPool.length - trendUpCount;
+  const hasEnoughTrendData = trendPool.length >= 3;
+
+  const progressiveOverloadValue = !hasEnoughTrendData
+    ? "Not enough data"
+    : trendUpCount > trendDownCount
+      ? "Trending Up"
+      : trendUpCount === trendDownCount
+        ? "Mixed"
+        : "Needs Focus";
+
+  const progressiveOverloadDetail = !hasEnoughTrendData
+    ? "Complete more workouts to detect trend"
+    : `${trendUpCount}/${trendPool.length} sessions improved`;
 
   async function startSessionAction(formData: FormData) {
     "use server";
@@ -44,14 +66,10 @@ export default async function Home() {
 
       <section className="grid grid-cols-2 gap-3">
         <StatCard
-          icon={<Activity className="h-4 w-4" />}
-          label="Active Workout"
-          value={activeSession ? activeSession.name_snapshot : "None"}
-          detail={
-            activeSession
-              ? `Started ${formatWorkoutDateTime(activeSession.started_at)}`
-              : "No workout in progress"
-          }
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Progressive Overload"
+          value={progressiveOverloadValue}
+          detail={progressiveOverloadDetail}
         />
         <StatCard
           icon={<Clock3 className="h-4 w-4" />}
@@ -63,7 +81,7 @@ export default async function Home() {
           }
           detail={
             lastCompletedSession
-              ? `${lastCompletedSession.name_snapshot} • ${formatWorkoutDateTime(lastCompletedSession.started_at)}`
+              ? `${lastCompletedSession.name_snapshot} - ${formatWorkoutDateTime(lastCompletedSession.started_at)}`
               : "Complete a workout to populate"
           }
         />
@@ -73,7 +91,12 @@ export default async function Home() {
           value={analytics30.sessions}
           detail="Completed workouts"
         />
-        <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Sets (30d)" value={analytics30.sets} detail="Total logged sets" />
+        <StatCard
+          icon={<BarChart3 className="h-4 w-4" />}
+          label="Sets (30d)"
+          value={analytics30.sets}
+          detail="Total logged sets"
+        />
       </section>
 
       <section className="surface">

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 
 import { HistoryFilter } from "@/components/history-filter";
 import { formatSessionDuration, formatWorkoutDateTime } from "@/lib/format";
-import { listSessions } from "@/lib/store";
+import { listCompletedSessionsWithProgress } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +15,9 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const { range } = await searchParams;
   const selectedRange = range === "month" || range === "year" || range === "all" ? range : "month";
 
-  const sessions = (await listSessions())
-    .filter((session) => session.status === "completed")
-    .filter((session) => matchesRange(session.started_at, selectedRange));
+  const sessions = (await listCompletedSessionsWithProgress()).filter((session) =>
+    matchesRange(session.started_at, selectedRange),
+  );
 
   const subtitle =
     selectedRange === "month"
@@ -56,7 +56,14 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
                         {formatSessionDuration(session.started_at, session.ended_at)}
                       </p>
                     </div>
-                    <ArrowRight className="h-5 w-5 shrink-0 text-muted" />
+                    <div className="flex items-center gap-2">
+                      {session.progress_direction === "up" ? (
+                        <TrendingUp className="h-4 w-4 shrink-0 text-emerald-400" />
+                      ) : session.progress_direction === "down" ? (
+                        <TrendingDown className="h-4 w-4 shrink-0 text-red-400" />
+                      ) : null}
+                      <ArrowRight className="h-5 w-5 shrink-0 text-muted" />
+                    </div>
                   </div>
                 </Link>
               </li>

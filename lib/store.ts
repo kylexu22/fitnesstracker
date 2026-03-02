@@ -63,6 +63,10 @@ export type SessionListItem = WorkoutSession & {
   set_count: number;
 };
 
+export type SessionProgressListItem = SessionListItem & {
+  progress_direction: "up" | "down" | null;
+};
+
 export type AnalyticsSummary = {
   sessions: number;
   sets: number;
@@ -723,5 +727,90 @@ export async function listAnalyticsDaily(days = 30): Promise<AnalyticsDailyItem[
     left join exercise_logs e on e.day = s.day
     group by s.day
     order by s.day asc
+  `;
+}
+
+export async function listCompletedSessionsWithProgress(limit = 50) {
+  return sql<SessionProgressListItem[]>`
+    with completed as (
+      select
+        s.id,
+        s.template_id,
+        s.name_snapshot,
+        s.started_at,
+        s.ended_at,
+        s.status,
+        coalesce(count(distinct se.id), 0)::int as exercise_count,
+        coalesce(count(sl.id), 0)::int as set_count
+      from workout_sessions s
+      left join session_exercises se on se.session_id = s.id
+      left join set_logs sl on sl.session_exercise_id = se.id
+      where s.status = 'completed'
+      group by s.id
+    ),
+    exercise_weights as (
+      select
+        se.session_id,
+        se.exercise_id,
+        max(coalesce(sl.weight, 0))::numeric as max_weight
+      from session_exercises se
+      join set_logs sl on sl.session_exercise_id = se.id
+      where se.exercise_id is not null
+      group by se.session_id, se.exercise_id
+    ),
+    exercise_best as (
+      select
+        ew.session_id,
+        ew.exercise_id,
+        ew.max_weight,
+        max(sl.reps)::int as max_reps
+      from exercise_weights ew
+      join session_exercises se
+        on se.session_id = ew.session_id
+       and se.exercise_id = ew.exercise_id
+      join set_logs sl on sl.session_exercise_id = se.id
+      where coalesce(sl.weight, 0)::numeric = ew.max_weight
+      group by ew.session_id, ew.exercise_id, ew.max_weight
+    )
+    select
+      c.id,
+      c.template_id,
+      c.name_snapshot,
+      c.started_at,
+      c.ended_at,
+      c.status,
+      c.exercise_count,
+      c.set_count,
+      case
+        when prev.prev_session_id is null then null
+        when compare.comparable_count = 0 then null
+        when compare.improved_count = compare.comparable_count then 'up'
+        else 'down'
+      end as progress_direction
+    from completed c
+    left join lateral (
+      select p.id as prev_session_id
+      from completed p
+      where c.template_id is not null
+        and p.template_id = c.template_id
+        and p.started_at < c.started_at
+      order by p.started_at desc
+      limit 1
+    ) prev on true
+    left join lateral (
+      select
+        count(*)::int as comparable_count,
+        count(*) filter (
+          where cb.max_weight > pb.max_weight
+             or (cb.max_weight = pb.max_weight and cb.max_reps > pb.max_reps)
+        )::int as improved_count
+      from exercise_best cb
+      join exercise_best pb
+        on pb.session_id = prev.prev_session_id
+       and pb.exercise_id = cb.exercise_id
+      where cb.session_id = c.id
+    ) compare on true
+    order by c.started_at desc
+    limit ${limit}
   `;
 }
