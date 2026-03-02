@@ -2,9 +2,10 @@ import { Plus } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import { CancelSessionButton } from "@/components/cancel-session-button";
 import { FinishSessionButton } from "@/components/finish-session-button";
 import { WorkoutSessionHeader } from "@/components/workout-session-header";
-import { addSetLog, completeSession, getSessionById } from "@/lib/store";
+import { abandonSession, addSetLog, completeSession, getSessionById } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -43,17 +44,30 @@ export default async function WorkoutSessionPage({ params }: PageProps) {
     redirect(`/history/${sessionId}`);
   }
 
+  async function cancelSessionAction() {
+    "use server";
+
+    await abandonSession(sessionId);
+    revalidatePath("/");
+    revalidatePath("/history");
+    revalidatePath(`/workout/${sessionId}`);
+    redirect("/");
+  }
+
   return (
     <div className="page-shell workout-live-page">
       <section className="workout-sticky-header workout-sticky-header-bleed">
-        <WorkoutSessionHeader
-          templateName={sessionData.session.name_snapshot}
-          startedAt={sessionData.session.started_at}
-          endedAt={sessionData.session.ended_at}
-          status={sessionData.session.status}
-        />
-        <span></span>
-        
+        <div className="flex items-start justify-between gap-3">
+          <WorkoutSessionHeader
+            templateName={sessionData.session.name_snapshot}
+            startedAt={sessionData.session.started_at}
+            endedAt={sessionData.session.ended_at}
+            status={sessionData.session.status}
+          />
+          {sessionData.session.status === "active" ? (
+            <CancelSessionButton action={cancelSessionAction} />
+          ) : null}
+        </div>
       </section>
 
       <div className="workout-scroll-overlay workout-scroll-overlay-bleed" aria-hidden />

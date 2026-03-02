@@ -1,9 +1,13 @@
-const CACHE_NAME = "fitness-tracker-v1";
-const APP_SHELL = ["/", "/exercises", "/templates", "/workout/start", "/history"];
+const CACHE_NAME = "fitness-tracker-static-v2";
+const STATIC_ASSETS = ["/backgroundimage.png", "/icon.svg"];
+const STATIC_DESTINATIONS = new Set(["style", "script", "font", "image"]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -24,19 +28,39 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Never cache dynamic app/document requests; always try fresh network data.
+  if (request.mode === "navigate" || request.destination === "document") {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Cache only static assets and keep them fresh in the background.
+  if (!STATIC_DESTINATIONS.has(request.destination)) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
+      const networkPromise = fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+          }
+          return response;
+        });
+
       if (cached) {
         return cached;
       }
 
-      return fetch(request)
-        .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-          return response;
-        })
-        .catch(() => caches.match("/"));
+      return networkPromise;
     }),
   );
 });

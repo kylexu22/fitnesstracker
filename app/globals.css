@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../node_modules/@tremor/react/dist/**/*.{js,cjs}";
 
 :root {
   --background: #0a0a0f;
@@ -437,4 +438,82 @@ textarea.input {
 .workout-scroll-content {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.35) 1rem, rgba(0, 0, 0, 1) 3.2rem);
   mask-image: linear-gradient(to bottom, transparent 0, rgba(0, 0, 0, 0.35) 1rem, rgba(0, 0, 0, 1) 3.2rem);
+}
+
+.workout-cancel-button {
+  width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  border-radius: 0.62rem;
+}
+
+.chart-theme .recharts-cartesian-grid line {
+  stroke: rgba(168, 175, 203, 0.32);
+}
+
+.chart-theme .recharts-cartesian-axis-tick-value,
+.chart-theme .recharts-legend-item-text {
+  fill: #aab2c6 !important;
+  color: #aab2c6 !important;
+  font-size: 12px;
+}
+
+.chart-theme .recharts-xAxis .recharts-cartesian-axis-tick-value {
+  font-size: 11px;
+}
+
+.chart-theme .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: rgba(9, 11, 20, 0.96) !important;
+  border: 1px solid rgba(120, 129, 160, 0.45) !important;
+  border-radius: 10px !important;
+  color: #e5e7eb !important;
+}
+
+.chart-theme .recharts-tooltip-wrapper .recharts-tooltip-label,
+.chart-theme .recharts-tooltip-wrapper .recharts-tooltip-item {
+  color: #e5e7eb !important;
+}
+
+.analytics-trend-chart .recharts-area-curve:nth-of-type(1) {
+  stroke: #8b7aff !important;
+}
+
+.analytics-trend-chart .recharts-area-area:nth-of-type(1) {
+  fill: rgba(139, 122, 255, 0.26) !important;
+}
+
+.analytics-trend-chart .recharts-area-curve:nth-of-type(2) {
+  stroke: #22d3ee !important;
+}
+
+.analytics-trend-chart .recharts-area-area:nth-of-type(2) {
+  fill: rgba(34, 211, 238, 0.22) !important;
+}
+
+.analytics-trend-chart .recharts-area-curve:nth-of-type(3) {
+  stroke: #34d399 !important;
+}
+
+.analytics-trend-chart .recharts-area-area:nth-of-type(3) {
+  fill: rgba(52, 211, 153, 0.22) !important;
+}
+
+.analytics-tonnage-chart .recharts-bar-rectangle path,
+.analytics-tonnage-chart .recharts-bar-rectangle rect {
+  fill: #7a86ff !important;
+}
+
+.analytics-tonnage-chart .recharts-bar-rectangle [fill="black"],
+.analytics-tonnage-chart .recharts-bar-rectangle [fill="#000"],
+.analytics-tonnage-chart .recharts-bar-rectangle [fill="#000000"],
+.analytics-tonnage-chart .recharts-bar-rectangle [fill="rgb(0,0,0)"] {
+  fill: #7a86ff !important;
+}
+
+.exercise-history-chart .recharts-dot[fill="black"],
+.exercise-history-chart .recharts-dot[fill="#000"],
+.exercise-history-chart .recharts-dot[fill="#000000"],
+.exercise-history-chart .recharts-dot[fill="rgb(0,0,0)"] {
+  fill: #8b7aff !important;
+  stroke: #8b7aff !important;
 }

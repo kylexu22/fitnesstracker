@@ -76,6 +76,22 @@ export type AnalyticsSummary = {
   }>;
 };
 
+export type AnalyticsDailyItem = {
+  day: string;
+  sessions: number;
+  sets: number;
+  reps: number;
+};
+
+export type ExerciseHistoryItem = {
+  session_id: string;
+  session_name: string;
+  started_at: Date;
+  set_count: number;
+  max_reps: number;
+  max_weight: string | null;
+};
+
 export async function listExercises() {
   return sql<Exercise[]>`
     select
@@ -112,6 +128,43 @@ export async function archiveExercise(exerciseId: string) {
     update exercises
     set archived_at = now()
     where id = ${exerciseId}
+  `;
+}
+
+export async function getExerciseById(exerciseId: string) {
+  const [exercise] = await sql<Exercise[]>`
+    select
+      id,
+      name,
+      muscle_group,
+      equipment,
+      notes,
+      archived_at,
+      created_at
+    from exercises
+    where id = ${exerciseId}
+  `;
+
+  return exercise ?? null;
+}
+
+export async function listExerciseHistory(exerciseId: string, limit = 50) {
+  return sql<ExerciseHistoryItem[]>`
+    select
+      s.id as session_id,
+      s.name_snapshot as session_name,
+      s.started_at,
+      count(sl.id)::int as set_count,
+      coalesce(max(sl.reps), 0)::int as max_reps,
+      max(sl.weight) as max_weight
+    from workout_sessions s
+    join session_exercises se on se.session_id = s.id
+    join set_logs sl on sl.session_exercise_id = se.id
+    where se.exercise_id = ${exerciseId}
+      and s.status = 'completed'
+    group by s.id
+    order by s.started_at desc
+    limit ${limit}
   `;
 }
 
@@ -398,6 +451,14 @@ export async function completeSession(sessionId: string) {
   `;
 }
 
+export async function abandonSession(sessionId: string) {
+  await sql`
+    update workout_sessions
+    set status = 'abandoned', ended_at = now()
+    where id = ${sessionId} and status = 'active'
+  `;
+}
+
 export async function listActiveSessions() {
   return sql<WorkoutSession[]>`
     select id, template_id, name_snapshot, started_at, ended_at, status
@@ -626,4 +687,41 @@ export async function getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> 
       tonnage: Number(item.tonnage ?? "0"),
     })),
   };
+}
+
+export async function listAnalyticsDaily(days = 30): Promise<AnalyticsDailyItem[]> {
+  return sql<AnalyticsDailyItem[]>`
+    with series as (
+      select generate_series(
+        current_date - (${days - 1} * interval '1 day'),
+        current_date,
+        interval '1 day'
+      )::date as day
+    ),
+    completed as (
+      select id, started_at::date as day
+      from workout_sessions
+      where status = 'completed'
+        and started_at >= current_date - (${days - 1} * interval '1 day')
+    ),
+    exercise_logs as (
+      select
+        c.day,
+        c.id as session_id,
+        sl.id as set_id,
+        sl.reps
+      from completed c
+      left join session_exercises se on se.session_id = c.id
+      left join set_logs sl on sl.session_exercise_id = se.id
+    )
+    select
+      to_char(s.day, 'Mon DD') as day,
+      coalesce(count(distinct e.session_id), 0)::int as sessions,
+      coalesce(count(e.set_id), 0)::int as sets,
+      coalesce(sum(e.reps), 0)::int as reps
+    from series s
+    left join exercise_logs e on e.day = s.day
+    group by s.day
+    order by s.day asc
+  `;
 }

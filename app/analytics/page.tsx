@@ -1,11 +1,12 @@
 import { Activity, BarChart3, Repeat, Weight } from "lucide-react";
 
-import { getAnalyticsSummary } from "@/lib/store";
+import { AnalyticsTremorCharts } from "@/components/analytics-tremor-charts";
+import { getAnalyticsSummary, listAnalyticsDaily } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage() {
-  const summary = await getAnalyticsSummary(30);
+  const [summary, daily] = await Promise.all([getAnalyticsSummary(30), listAnalyticsDaily(30)]);
 
   return (
     <div className="page-shell">
@@ -25,28 +26,13 @@ export default async function AnalyticsPage() {
         </div>
       </section>
 
-      <section className="surface">
-        <h2 className="text-lg font-semibold">Top Exercises by Volume</h2>
-        {summary.topExercises.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">No completed workout data yet.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {summary.topExercises.map((exercise, index) => (
-              <li key={exercise.exercise_name_snapshot} className="muted-surface">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium">
-                    <span className="chip mr-2">#{index + 1}</span>
-                    {exercise.exercise_name_snapshot}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {exercise.sets} sets | {exercise.reps} reps | {exercise.tonnage.toLocaleString()} total
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {summary.topExercises.length === 0 ? (
+        <section className="surface">
+          <p className="text-sm text-muted">No completed workout data yet.</p>
+        </section>
+      ) : (
+        <AnalyticsTremorCharts daily={daily} topExercises={summary.topExercises} />
+      )}
     </div>
   );
 }

@@ -1,21 +1,26 @@
 import Link from "next/link";
-import { Activity, ArrowRight, BarChart3, Dumbbell, FileText } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, CalendarDays, Clock3 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { StartWorkoutModal } from "@/components/start-workout-modal";
 import { formatSessionDuration, formatWorkoutDateTime } from "@/lib/format";
-import { getDashboardStats, listActiveSessions, listSessions, listTemplates, startSessionFromTemplate } from "@/lib/store";
+import { getAnalyticsSummary, listActiveSessions, listSessions, listTemplates, startSessionFromTemplate } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [stats, recentSessions, templates, activeSessions] = await Promise.all([
-    getDashboardStats(),
-    listSessions(3),
+  const [allRecentSessions, templates, activeSessions, analytics30] = await Promise.all([
+    listSessions(20),
     listTemplates(),
     listActiveSessions(),
+    getAnalyticsSummary(30),
   ]);
+  const activeSession = activeSessions[0] ?? null;
+  const completedRecentSessions = allRecentSessions
+    .filter((session) => session.status === "completed")
+    .slice(0, 3);
+  const lastCompletedSession = completedRecentSessions[0] ?? null;
 
   async function startSessionAction(formData: FormData) {
     "use server";
@@ -34,19 +39,41 @@ export default async function Home() {
   return (
     <div className="page-shell">
       <section>
-        <h1 className="text-3xl font-bold">Welcome back</h1>
+        <h1 className="text-3xl font-bold">Welcome back, Beast.</h1>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={<Dumbbell className="h-4 w-4" />} label="Exercises" value={stats.exerciseCount} />
-        <StatCard icon={<FileText className="h-4 w-4" />} label="Templates" value={stats.templateCount} />
-        <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Completed" value={stats.completedSessions} />
+      <section className="grid grid-cols-2 gap-3">
         <StatCard
           icon={<Activity className="h-4 w-4" />}
-          label="Active Session"
-          value={stats.activeSession ? stats.activeSession.name_snapshot : "None"}
-          small
+          label="Active Workout"
+          value={activeSession ? activeSession.name_snapshot : "None"}
+          detail={
+            activeSession
+              ? `Started ${formatWorkoutDateTime(activeSession.started_at)}`
+              : "No workout in progress"
+          }
         />
+        <StatCard
+          icon={<Clock3 className="h-4 w-4" />}
+          label="Last Session"
+          value={
+            lastCompletedSession
+              ? formatSessionDuration(lastCompletedSession.started_at, lastCompletedSession.ended_at)
+              : "No data"
+          }
+          detail={
+            lastCompletedSession
+              ? `${lastCompletedSession.name_snapshot} • ${formatWorkoutDateTime(lastCompletedSession.started_at)}`
+              : "Complete a workout to populate"
+          }
+        />
+        <StatCard
+          icon={<CalendarDays className="h-4 w-4" />}
+          label="Sessions (30d)"
+          value={analytics30.sessions}
+          detail="Completed workouts"
+        />
+        <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Sets (30d)" value={analytics30.sets} detail="Total logged sets" />
       </section>
 
       <section className="surface">
@@ -57,11 +84,11 @@ export default async function Home() {
           </Link>
         </div>
 
-        {recentSessions.length === 0 ? (
+        {completedRecentSessions.length === 0 ? (
           <p className="text-sm text-muted">No sessions logged yet.</p>
         ) : (
           <ul className="space-y-2">
-            {recentSessions.map((session) => (
+            {completedRecentSessions.map((session) => (
               <li key={session.id} className="muted-surface">
                 <Link href={`/history/${session.id}`} className="flex items-center justify-between gap-3">
                   <div>
@@ -85,10 +112,10 @@ export default async function Home() {
           exerciseCount: template.exercise_count,
         }))}
         activeSession={
-          activeSessions[0]
+          activeSession
             ? {
-                id: activeSessions[0].id,
-                name: activeSessions[0].name_snapshot,
+                id: activeSession.id,
+                name: activeSession.name_snapshot,
               }
             : null
         }
@@ -102,18 +129,19 @@ function StatCard({
   icon,
   label,
   value,
-  small,
+  detail,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  small?: boolean;
+  detail: string;
 }) {
   return (
-    <div className="stat-card">
+    <div className="stat-card min-h-[8.25rem]">
       <span className="mb-2 inline-flex rounded-lg bg-primary/15 p-2 text-primary">{icon}</span>
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 font-semibold ${small ? "text-sm" : "text-2xl"}`}>{value}</p>
+      <p className="mt-1 text-xl font-semibold leading-tight">{value}</p>
+      <p className="mt-1 line-clamp-2 text-[11px] text-muted">{detail}</p>
     </div>
   );
 }

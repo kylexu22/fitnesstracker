@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, History as HistoryIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { HistoryFilter } from "@/components/history-filter";
 import { formatSessionDuration, formatWorkoutDateTime } from "@/lib/format";
@@ -32,7 +32,6 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-3 text-3xl font-semibold">
-              <HistoryIcon className="h-7 w-7" />
               Workout History
             </h1>
             <p className="mt-1 text-sm text-muted">{subtitle}</p>
